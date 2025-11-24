@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MythicName - Local Infinite Character Generator</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Babel for JSX/TS compilation in browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Import Map for dependencies -->
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/client": "https://aistudiocdn.com/react-dom@^19.2.0/client",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
+  }
+}
+</script>
+
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+      
+      body {
+        font-family: 'Noto Sans SC', sans-serif;
+        background-color: #020617; /* Slate 950 */
+      }
+      
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0f172a; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #334155; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #475569; 
+      }
+      
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fadeIn {
+        animation: fadeIn 0.5s ease-out forwards;
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module" data-presets="typescript,react">
+      import React, { useState, useEffect } from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { Sparkles, ScrollText, Wand2, Loader2, BookOpenCheck, RefreshCcw, Trash2, Shield, BookOpen, Copy, Check, WifiOff } from 'lucide-react';
+
+      // --- CONFIGURATION & TYPES ---
+
+      const NovelGenre = {
+        XUANHUAN: '玄幻奇幻',
+        XIANXIA: '仙侠武侠',
+        URBAN: '都市生活',
+        ROMANCE: '现代言情',
+        ANCIENT_ROMANCE: '古代言情',
+        LEISURE: '休闲种田',
+        SCIFI: '科幻末世',
+        HISTORY: '历史军事',
+        GAME: '网游电竞',
+        SUSPENSE: '悬疑灵异',
+        LIGHT_NOVEL: '轻小说/二次元',
+        WESTERN: '西方魔幻',
+        CYBERPUNK: '赛博朋克',
+        CAMPUS: '青春校园',
+        HORROR: '恐怖惊悚',
+        SPORTS: '体育竞技',
+        ENTERTAINMENT: '文娱明星',
+        WAR: '战争谍战',
+        STREAMING: '无限流'
+      };
+
+      const Gender = {
+        MALE: '男',
+        FEMALE: '女',
+        NEUTRAL: '无性/未知'
+      };
+
+      const RoleType = {
+        PROTAGONIST: '主角 (天命之子)',
+        ANTAGONIST: '反派 (魔头/对手)',
+        SUPPORTING: '重要配角 (伙伴)',
+        ELITE_EXTRA: '高级配角 (精英)',
+        PASSERBY: '路人 (炮灰)',
+        HIDDEN_BOSS: '隐藏大佬 (扫地僧)'
+      };
+
+      const Alignment = {
+        LAWFUL_GOOD: '正派 (守序善良)',
+        CHAOTIC_GOOD: '亦正亦邪 (自由)',
+        NEUTRAL: '中立 (利益至上)',
+        CHAOTIC_EVIL: '反派 (混乱邪恶)',
+        EXTREME: '极端 (疯批/偏执)'
+      };
+
+      const Language = {
+        CHINESE: '中文',
+        ENGLISH: '英语 (西方)',
+        JAPANESE: '日语',
+        FRENCH: '法语',
+        RUSSIAN: '俄语'
+      };
+
+      const NameLength = {
+        RANDOM: '随机',
+        TWO: '2字 (单名)',
+        THREE: '3字 (双名)',
+        FOUR: '4字 (复姓/长名)'
+      };
+
+      const PERSONALITY_PRESETS = [
+        '高冷', '腹黑', '热血', '温柔', '傲娇', '病娇',
+        '稳重', '活泼', '阴鸷', '疯狂', '圣母', '杀伐果断',
+        '玩世不恭', '社恐', '儒雅', '暴躁', '呆萌', '偏执',
+        '狡诈', '忠诚', '神秘', '乐天', '孤僻', '自恋'
+      ];
+
+      // --- LOCAL DATA ENGINE (OFFLINE MODE) ---
+      
+      const DATA_POOLS = {
+        SURNAMES: {
+          ANCIENT: ['叶', '萧', '林', '楚', '苏', '秦', '凤', '龙', '轩辕', '独孤', '皇甫', '上官', '慕容', '南宫', '墨', '顾', '柳', '云', '风', '雷', '白', '君', '夜', '冷', '花', '月', '雪', '沈', '江', '洛'],
+          MODERN: ['李', '王', '张', '陈', '杨', '赵', '黄', '周', '吴', '徐', '孙', '胡', '朱', '高', '林', '何', '郭', '马', '罗', '梁', '宋', '郑', '谢', '韩', '唐', '冯', '于', '董', '萧', '程', '曹', '袁', '邓', '许', '傅'],
+          WESTERN: ['Smith', 'Jones', 'Williams', 'Brown', 'Wilson', 'Taylor', 'Evans', 'Thomas', 'Roberts', 'Walker', 'Wright', 'Robinson', 'Thompson', 'White', 'Hughes', 'Edwards', 'Green', 'Hall', 'Wood', 'Harris', 'Martin', 'Jackson', 'Clarke'],
+          JAPANESE: ['佐藤', '铃木', '高桥', '田中', '渡边', '伊藤', '山本', '中村', '小林', '加藤', '吉田', '山田', '佐罗', '松本', '井上', '木村', '林', '清水', '山崎', '森', '阿部', '池田', '桥本', '山下', '石川']
+        },
+        CHARS: {
+          FIRE: ['炎', '焱', '火', '烈', '燃', '阳', '日', '赤', '赫', '烁', '煌', '焚', '烬', '旭', '曦', '曜', '在此', '炜', '炫'],
+          ICE: ['雪', '霜', '冰', '寒', '冷', '凌', '冬', '凝', '凛', '清', '洁', '素', '白', '晶', '莹', '在此', '冽', '冻'],
+          DARK: ['幽', '冥', '暗', '夜', '黑', '影', '煞', '魔', '邪', '鬼', '渊', '沉', '寂', '灭', '隐', '诡', '玄', '墨', '乌'],
+          LIGHT: ['光', '明', '圣', '曦', '白', '耀', '辉', '在此', '晨', '晓', '昭', '皓', '熙', '瑞', '祥', '吉', '天', '神'],
+          NATURE: ['风', '云', '雷', '电', '雨', '山', '海', '河', '川', '林', '木', '森', '岩', '石', '峰', '岚', '岳', '苍', '青', '蓝', '碧', '翠', '花', '叶', '莲', '梅', '兰', '竹', '菊', '松', '柏'],
+          ELEGANT: ['雅', '儒', '文', '逸', '思', '涵', '若', '如', '伊', '在此', '诗', '画', '琴', '棋', '书', '墨', '韵', '律', '音', '乐', '华', '锦', '绣', '绮', '罗', '裳', '颜', '容', '姿'],
+          STRONG: ['刚', '强', '力', '勇', '猛', '武', '战', '胜', '凯', '捷', '霸', '雄', '豪', '杰', '俊', '伟', '大', '宏', '远', '志', '坚', '毅', '恒', '笃', '定', '安', '宁'],
+          MAGIC: ['灵', '魂', '魄', '神', '仙', '道', '法', '术', '奇', '幻', '梦', '异', '妖', '怪', '精', '怪', '魅', '魑', '魅', '魍', '魉']
+        },
+        // English Names
+        EN_GIVEN: {
+          MALE: ['Arthur', 'Liam', 'Noah', 'Oliver', 'Elijah', 'James', 'William', 'Benjamin', 'Lucas', 'Henry', 'Alexander', 'Mason', 'Michael', 'Ethan', 'Daniel', 'Jacob', 'Logan', 'Jackson', 'Levi', 'Sebastian', 'Jack', 'Owen', 'Theodore', 'Aiden', 'Samuel', 'Joseph', 'John', 'David', 'Wyatt', 'Matthew'],
+          FEMALE: ['Olivia', 'Emma', 'Ava', 'Charlotte', 'Sophia', 'Amelia', 'Isabella', 'Mia', 'Evelyn', 'Harper', 'Camila', 'Gianna', 'Abigail', 'Luna', 'Ella', 'Elizabeth', 'Sofia', 'Emily', 'Avery', 'Mila', 'Scarlett', 'Eleanor', 'Madison', 'Layla', 'Penelope', 'Aria', 'Chloe', 'Grace', 'Ellie', 'Nora']
+        },
+        // Japanese Names
+        JP_GIVEN: {
+          MALE: ['翔太', '拓海', '健太', '大辅', '直树', '一马', '阳翔', '大和', '莲', '陆', '苍', '悠真', '树', '凑', '律', '光', '朝阳', '春马', '勇', '诚', '隆', '昭'],
+          FEMALE: ['结衣', '阳菜', '葵', '咲', '凛', '结菜', '莉子', '美咲', '爱', '花', '美月', '美桜', '心春', '奈绪', '遥', '千寻', '未来', '惠', '雪', '华']
+        },
+        TITLES: {
+          XUANHUAN: ['尊者', '大帝', '神王', '至尊', '圣主', '魔君', '道祖', '剑仙', '天师', '法神'],
+          URBAN: ['总裁', '少爷', '兵王', '神医', '校花', '大师', '老板', '经理', '教授', '探长'],
+          ANCIENT: ['将军', '王爷', '丞相', '国师', '尚书', '统领', '都督', '太守', '侠客', '掌门'],
+          SCIFI: ['指挥官', '舰长', '博士', '上校', '特工', '黑客', '机械师', '猎人', '执行官', '领主']
+        }
+      };
+
+      const LocalNameEngine = {
+        getRandomItem: (arr) => arr[Math.floor(Math.random() * arr.length)],
+        
+        getWeightedTags: (options) => {
+          let tags = ['NATURE']; // Base tag
+          const p = options.personality || '';
+          const g = options.genre;
+          const r = options.role;
+          const a = options.alignment;
+
+          // Personality to Tags Mapping
+          if (p.includes('冷') || p.includes('寒') || p.includes('阴')) tags.push('ICE');
+          if (p.includes('热') || p.includes('爆') || p.includes('阳')) tags.push('FIRE');
+          if (p.includes('黑') || p.includes('狠') || p.includes('邪') || p.includes('魔')) tags.push('DARK');
+          if (p.includes('光') || p.includes('正') || p.includes('善') || p.includes('圣')) tags.push('LIGHT');
+          if (p.includes('雅') || p.includes('文') || p.includes('静') || p.includes('柔')) tags.push('ELEGANT');
+          if (p.includes('强') || p.includes('刚') || p.includes('勇') || p.includes('霸')) tags.push('STRONG');
+          if (p.includes('仙') || p.includes('道') || p.includes('神')) tags.push('MAGIC');
+
+          // Genre Influences
+          if (g === NovelGenre.XUANHUAN || g === NovelGenre.XIANXIA) tags.push('MAGIC', 'NATURE');
+          if (g === NovelGenre.HORROR || g === NovelGenre.SUSPENSE) tags.push('DARK');
+          if (g === NovelGenre.WAR || g === NovelGenre.SPORTS) tags.push('STRONG');
+          if (g === NovelGenre.ANCIENT_ROMANCE) tags.push('ELEGANT', 'NATURE');
+
+          // Alignment Influences
+          if (a === Alignment.CHAOTIC_EVIL || r === RoleType.ANTAGONIST) tags.push('DARK');
+          if (a === Alignment.LAWFUL_GOOD && r === RoleType.PROTAGONIST) tags.push('LIGHT', 'STRONG');
+
+          // Element override
+          if (options.specificElement) {
+            if (['火', '炎', '日'].some(c => options.specificElement.includes(c))) tags.push('FIRE');
+            if (['水', '冰', '雪'].some(c => options.specificElement.includes(c))) tags.push('ICE');
+          }
+
+          return tags;
+        },
+
+        generateName: (options) => {
+          const { language, genre, gender, role, surname: fixedSurname, nameLength, specificElement } = options;
+          
+          let generatedSurname = '';
+          let generatedGivenName = '';
+          let fullPinyin = ''; // Used for original script in non-Chinese
+          
+          // --- 1. Surname Logic ---
+          if (fixedSurname) {
+            generatedSurname = fixedSurname;
+          } else {
+            if (language === Language.CHINESE) {
+              const isAncient = [NovelGenre.XUANHUAN, NovelGenre.XIANXIA, NovelGenre.ANCIENT_ROMANCE, NovelGenre.HISTORY].includes(genre);
+              generatedSurname = LocalNameEngine.getRandomItem(isAncient ? DATA_POOLS.SURNAMES.ANCIENT : DATA_POOLS.SURNAMES.MODERN);
+            } else if (language === Language.JAPANESE) {
+              generatedSurname = LocalNameEngine.getRandomItem(DATA_POOLS.SURNAMES.JAPANESE);
+            } else {
+              generatedSurname = LocalNameEngine.getRandomItem(DATA_POOLS.SURNAMES.WESTERN);
+            }
+          }
+
+          // --- 2. Given Name Logic ---
+          if (language === Language.CHINESE) {
+            // Determine length (1 or 2 chars for given name)
+            let len = 2;
+            if (nameLength === NameLength.TWO) len = 1;
+            if (nameLength === NameLength.THREE) len = 2;
+            if (nameLength === NameLength.FOUR) len = 3; // Rare, usually 2 char surname + 2 char name, simplified here
+            if (nameLength === NameLength.RANDOM) len = Math.random() > 0.3 ? 2 : 1;
+
+            const tags = LocalNameEngine.getWeightedTags(options);
+            
+            // Build Character Pool
+            let charPool = [];
+            tags.forEach(t => {
+              if (DATA_POOLS.CHARS[t]) charPool = [...charPool, ...DATA_POOLS.CHARS[t]];
+            });
+            // Fallback
+            if (charPool.length === 0) charPool = [...DATA_POOLS.CHARS.NATURE, ...DATA_POOLS.CHARS.ELEGANT];
+
+            // Specific Element Injection
+            if (specificElement) {
+              // 50% chance to include the specific element character directly if it's 1 char
+              if (specificElement.length === 1 && Math.random() > 0.5) {
+                generatedGivenName += specificElement;
+                len--;
+              }
+            }
+
+            // Fill remaining length
+            for (let i = 0; i < len; i++) {
+               // Avoid duplication if possible
+               let char = LocalNameEngine.getRandomItem(charPool);
+               if (generatedGivenName.includes(char) && charPool.length > 1) {
+                 char = LocalNameEngine.getRandomItem(charPool);
+               }
+               generatedGivenName += char;
+            }
+            
+            fullPinyin = ""; // Not strictly pinyin, but used for logic consistency
+
+          } else if (language === Language.JAPANESE) {
+            const list = gender === Gender.FEMALE ? DATA_POOLS.JP_GIVEN.FEMALE : DATA_POOLS.JP_GIVEN.MALE;
+            generatedGivenName = LocalNameEngine.getRandomItem(list);
+            fullPinyin = `${generatedSurname} ${generatedGivenName}`; // Native script
+
+          } else {
+            // Western
+            const list = gender === Gender.FEMALE ? DATA_POOLS.EN_GIVEN.FEMALE : DATA_POOLS.EN_GIVEN.MALE;
+            generatedGivenName = LocalNameEngine.getRandomItem(list);
+            fullPinyin = `${generatedGivenName} ${generatedSurname}`; // Native script
+          }
+
+          const fullName = language === Language.CHINESE 
+            ? generatedSurname + generatedGivenName 
+            : (language === Language.JAPANESE ? generatedSurname + generatedGivenName : generatedGivenName + " " + generatedSurname);
+
+          const displayPinyin = language === Language.CHINESE ? "" : fullPinyin;
+          const displayName = language === Language.CHINESE ? fullName : (language === Language.JAPANESE ? fullName : (generatedGivenName + " " + generatedSurname)); // Western order for display name logic if needed, but keeping consistent
+          
+          // --- 3. Metadata Generation ---
+          
+          // Title
+          let title = '';
+          const genreKey = Object.keys(DATA_POOLS.TITLES).find(k => NovelGenre[k] === genre);
+          if (genreKey && Math.random() > 0.5) {
+            title = LocalNameEngine.getRandomItem(DATA_POOLS.TITLES[genreKey]) || '';
+          }
+          if (!title) {
+             // Generic title fallback
+             title = role.split(' ')[0]; 
+          }
+
+          // Meaning
+          const meanings = [
+            `名字取自${genre.includes('古') ? '古籍' : '意象'}，寓意角色${options.personality.substring(0,4)}的性格。`,
+            `"${generatedGivenName}"二字暗示了其${role.split(' ')[0]}的宿命，与其${options.alignment.split(' ')[0]}的立场相呼应。`,
+            `字面蕴含${LocalNameEngine.getWeightedTags(options)[1] || '自然'}之力，象征着${options.personality ? options.personality.split(/[,，]/)[0] : '独特'}的精神内核。`,
+            `听起来${Math.random() > 0.5 ? '朗朗上口' : '深沉有力'}，非常适合${genre}背景下的${role.split(' ')[0]}。`
+          ];
+          const meaning = LocalNameEngine.getRandomItem(meanings);
+
+          // Appearance
+          const hair = ['黑发', '银发', '红发', '短发', '长发', '束发'];
+          const eye = ['星眸', '冷眼', '笑眼', '深邃', '凌厉', '桃花眼'];
+          const cloth = ['长袍', '劲装', '西装', '校服', '风衣', '铠甲'];
+          const feature = ['嘴角带笑', '面无表情', '眼神坚毅', '气质出尘', '杀气腾腾', '温文尔雅'];
+          
+          const appearance = `身着${LocalNameEngine.getRandomItem(cloth)}，${LocalNameEngine.getRandomItem(hair)}，${LocalNameEngine.getRandomItem(eye)}，${LocalNameEngine.getRandomItem(feature)}。`;
+
+          // Personality Summary
+          const personalitySummary = options.personality 
+            ? `核心为“${options.personality}”，外表${Math.random() > 0.5 ? '与内心一致' : '具有欺骗性'}，行事${options.alignment.includes('正') ? '光明磊落' : '难以捉摸'}。`
+            : `性格复杂多面，既有${role.split(' ')[0]}的觉悟，也有常人的情感。`;
+
+          return {
+            name: language === Language.ENGLISH ? displayName : fullName, // Swap for western? simplified.
+            pinyin: displayPinyin,
+            title,
+            meaning,
+            appearance,
+            personalitySummary
+          };
+        }
+      };
+
+      const generateCharacterNames = async (options) => {
+        // Simulate network delay for UX
+        await new Promise(resolve => setTimeout(resolve, 600)); 
+        
+        const results = [];
+        const count = 4;
+        
+        for (let i = 0; i < count; i++) {
+           results.push(LocalNameEngine.generateName(options));
+        }
+        
+        return results;
+      };
+
+      // --- COMPONENTS ---
+
+      const SelectionGroup = ({
+        label,
+        options,
+        selected,
+        onChange,
+        cols = 3
+      }) => {
+        const isLargeSet = options.length > 6;
+
+        return (
+          <div className="mb-6">
+            <h3 className="text-xs font-bold text-indigo-400/80 mb-3 uppercase tracking-wider flex items-center gap-2">
+              {label}
+            </h3>
+            <div className={`grid grid-cols-2 ${isLargeSet ? 'md:grid-cols-3 xl:grid-cols-4' : 'md:grid-cols-3'} gap-2.5`}>
+              {options.map((option) => (
+                <button
+                  key={option}
+                  onClick={() => onChange(option)}
+                  className={`
+                    px-2 py-2.5 rounded-lg text-xs font-medium transition-all duration-200 border truncate
+                    ${selected === option
+                      ? 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-500/20 scale-[1.02]'
+                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:border-slate-600 hover:text-slate-200'
+                    }
+                  `}
+                  title={option}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      };
+
+      const ResultCard = ({ data, index, language }) => {
+        const [copied, setCopied] = useState(false);
+
+        const handleCopy = () => {
+          let textToCopy = data.name;
+          navigator.clipboard.writeText(textToCopy).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          });
+        };
+
+        return (
+          <div 
+            className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6 hover:border-indigo-500/50 transition-all duration-300 animate-fadeIn group"
+            style={{ animationDelay: `${index * 100}ms` }}
+          >
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="text-3xl font-bold text-white mb-1 flex items-center gap-2 flex-wrap">
+                  {data.name}
+                  {data.pinyin && (
+                    <span className="text-sm font-normal text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 mt-1">
+                      {data.pinyin}
+                    </span>
+                  )}
+                </h2>
+                {data.title && (
+                  <span className="inline-block bg-slate-700/50 text-slate-400 text-xs px-2 py-1 rounded-full border border-slate-600 mt-2">
+                    {data.title}
+                  </span>
+                )}
+              </div>
+              
+              <button 
+                onClick={handleCopy}
+                className={`
+                  p-2 rounded-lg shrink-0 transition-all duration-200 border flex items-center justify-center
+                  ${copied 
+                    ? 'bg-green-500/20 text-green-400 border-green-500/30' 
+                    : 'bg-slate-700 text-indigo-400 border-slate-600 hover:bg-indigo-600 hover:text-white hover:border-indigo-500'
+                  }
+                `}
+                title="复制名字"
+              >
+                {copied ? <Check size={20} /> : <Copy size={20} />}
+              </button>
+            </div>
+
+            <div className="space-y-2.5">
+              <div className="flex gap-3">
+                <BookOpen className="text-slate-500 shrink-0 mt-0.5" size={16} />
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  <span className="text-slate-500 font-medium">寓意: </span>
+                  {data.meaning}
+                </p>
+              </div>
+              
+              <div className="flex gap-3">
+                <Sparkles className="text-yellow-500/70 shrink-0 mt-0.5" size={16} />
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  <span className="text-slate-500 font-medium">外貌: </span>
+                  {data.appearance}
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <Shield className="text-emerald-500/70 shrink-0 mt-0.5" size={16} />
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  <span className="text-slate-500 font-medium">性格: </span>
+                  {data.personalitySummary}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const App = () => {
+        const [loading, setLoading] = useState(false);
+        const [results, setResults] = useState([]);
+        const [history, setHistory] = useState(new Set());
+        const [error, setError] = useState(null);
+
+        const [options, setOptions] = useState({
+          genre: NovelGenre.XUANHUAN,
+          gender: Gender.MALE,
+          role: RoleType.PROTAGONIST,
+          alignment: Alignment.LAWFUL_GOOD,
+          personality: '坚毅，冷静',
+          surname: '',
+          specificElement: '',
+          language: Language.CHINESE,
+          nameLength: NameLength.THREE
+        });
+
+        const handleGenerate = async () => {
+          setLoading(true);
+          setError(null);
+          setResults([]); 
+
+          try {
+            const names = await generateCharacterNames({
+              ...options,
+              excludeNames: Array.from(history)
+            });
+            
+            setResults(names);
+
+            const newHistory = new Set(history);
+            names.forEach(n => newHistory.add(n.name));
+            setHistory(newHistory);
+
+          } catch (err) {
+            setError("生成出现未知错误。");
+            console.error(err);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        const handleClearHistory = () => {
+          setHistory(new Set());
+          setResults([]);
+        };
+
+        const handlePersonalityToggle = (trait) => {
+          const currentTraits = options.personality.split(/[,，\s]+/).filter(t => t.trim().length > 0);
+          
+          let newTraits;
+          if (currentTraits.includes(trait)) {
+            newTraits = currentTraits.filter(t => t !== trait);
+          } else {
+            newTraits = [...currentTraits, trait];
+          }
+          
+          setOptions({
+            ...options,
+            personality: newTraits.join('，')
+          });
+        };
+
+        return (
+          <div className="min-h-screen text-slate-200 font-sans selection:bg-indigo-500/30">
+            <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg text-white">
+                    <BookOpenCheck size={20} />
+                  </div>
+                  <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+                    小说角色起名器 <span className="text-xs font-normal text-slate-500 ml-2 border border-slate-700 rounded px-1.5 py-0.5">本地旗舰版</span>
+                  </h1>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-green-400 bg-green-900/20 px-2 py-1 rounded border border-green-900/30">
+                   <WifiOff size={12} />
+                   <span>离线可用</span>
+                </div>
+              </div>
+            </nav>
+
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+                
+                <div className="lg:col-span-5 space-y-8">
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                    <div className="flex items-center gap-2 mb-6">
+                      <ScrollText className="text-indigo-400" size={24} />
+                      <h2 className="text-xl font-bold text-white">设定面板</h2>
+                    </div>
+
+                    <SelectionGroup 
+                      label="目标语言" 
+                      options={Object.values(Language)} 
+                      selected={options.language}
+                      onChange={(v) => setOptions({...options, language: v})}
+                      cols={3}
+                    />
+
+                    <SelectionGroup 
+                      label="小说类型" 
+                      options={Object.values(NovelGenre)} 
+                      selected={options.genre}
+                      onChange={(v) => setOptions({...options, genre: v})}
+                      cols={2}
+                    />
+
+                    {options.language === Language.CHINESE && (
+                      <SelectionGroup 
+                        label="姓名长度 (仅中文有效)" 
+                        options={Object.values(NameLength)} 
+                        selected={options.nameLength}
+                        onChange={(v) => setOptions({...options, nameLength: v})}
+                        cols={4}
+                      />
+                    )}
+
+                    <SelectionGroup 
+                      label="角色性别" 
+                      options={Object.values(Gender)} 
+                      selected={options.gender}
+                      onChange={(v) => setOptions({...options, gender: v})}
+                      cols={3}
+                    />
+
+                    <SelectionGroup 
+                      label="角色定位" 
+                      options={Object.values(RoleType)} 
+                      selected={options.role}
+                      onChange={(v) => setOptions({...options, role: v})}
+                      cols={2}
+                    />
+
+                    <SelectionGroup 
+                      label="阵营倾向" 
+                      options={Object.values(Alignment)} 
+                      selected={options.alignment}
+                      onChange={(v) => setOptions({...options, alignment: v})}
+                      cols={2}
+                    />
+
+                    <div className="mb-6">
+                      <label className="block text-sm font-semibold text-gray-400 mb-2.5">
+                        性格特征 <span className="text-xs font-normal text-slate-500">(可多选或自定义)</span>
+                      </label>
+                      
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {PERSONALITY_PRESETS.map((trait) => {
+                          const currentParts = options.personality.split(/[,，\s]+/).map(p => p.trim());
+                          const isActive = currentParts.includes(trait);
+                          
+                          return (
+                            <button
+                              key={trait}
+                              onClick={() => handlePersonalityToggle(trait)}
+                              className={`
+                                px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 border
+                                ${isActive
+                                  ? 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-500/20'
+                                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                                }
+                              `}
+                            >
+                              {trait}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <input 
+                        type="text" 
+                        placeholder="自定义性格，如：高冷, 腹黑..."
+                        value={options.personality}
+                        onChange={(e) => setOptions({...options, personality: e.target.value})}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-5 mb-8">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-400 mb-2">指定姓氏 (可选)</label>
+                          <input 
+                            type="text" 
+                            placeholder="如：叶, 萧"
+                            value={options.surname}
+                            onChange={(e) => setOptions({...options, surname: e.target.value})}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-400 mb-2">特殊元素</label>
+                          <input 
+                            type="text" 
+                            placeholder="如：火, 剑, 系统"
+                            value={options.specificElement}
+                            onChange={(e) => setOptions({...options, specificElement: e.target.value})}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={handleGenerate}
+                        disabled={loading}
+                        className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loading ? (
+                          <>
+                            <Loader2 className="animate-spin" size={24} />
+                            <span>极速生成中...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 size={24} />
+                            <span>立即生成角色</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    
+                    {history.size > 0 && (
+                       <div className="mt-4 flex justify-between items-center px-2">
+                          <span className="text-xs text-slate-500">
+                            已生成 {history.size} 个不重复名字
+                          </span>
+                          <button 
+                            onClick={handleClearHistory}
+                            className="text-xs text-slate-500 hover:text-red-400 flex items-center gap-1 transition-colors"
+                          >
+                            <Trash2 size={12} />
+                            清空记录
+                          </button>
+                       </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="lg:col-span-7 space-y-6">
+                   <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="text-yellow-500" size={24} />
+                        <h2 className="text-xl font-bold text-white">生成结果</h2>
+                      </div>
+                      
+                      {results.length > 0 && (
+                        <button 
+                          onClick={handleGenerate}
+                          disabled={loading}
+                          className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg text-sm font-medium transition-all border border-slate-700 hover:border-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed group"
+                        >
+                          <RefreshCcw size={16} className={`group-hover:rotate-180 transition-transform duration-500 ${loading ? 'animate-spin' : ''}`} />
+                          <span>{loading ? '生成中...' : '换一批 (不重复)'}</span>
+                        </button>
+                      )}
+                   </div>
+
+                   {error && (
+                     <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-center">
+                       {error}
+                     </div>
+                   )}
+
+                   {results.length === 0 && !loading && !error && (
+                     <div className="h-[500px] flex flex-col items-center justify-center border-2 border-dashed border-slate-800 rounded-2xl text-slate-600 bg-slate-900/30">
+                       <div className="bg-slate-800 p-5 rounded-full mb-4 shadow-inner">
+                          <BookOpenCheck size={48} className="opacity-50 text-indigo-400" />
+                       </div>
+                       <p className="text-xl font-medium text-slate-400">等待灵感注入...</p>
+                       <p className="text-sm mt-2 text-slate-500">本地无限引擎已就绪，无需联网即可使用</p>
+                     </div>
+                   )}
+
+                   {loading && results.length === 0 && (
+                      <div className="space-y-4">
+                        {[1, 2, 3, 4].map((i) => (
+                          <div key={i} className="h-44 bg-slate-800/50 rounded-2xl animate-pulse border border-slate-800"></div>
+                        ))}
+                      </div>
+                   )}
+
+                   <div className="grid grid-cols-1 gap-4">
+                     {results.map((name, idx) => (
+                       <ResultCard 
+                          key={idx} 
+                          data={name} 
+                          index={idx} 
+                          language={options.language} 
+                       />
+                     ))}
+                   </div>
+                </div>
+              </div>
+            </main>
+          </div>
+        );
+      };
+
+      const root = createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+  </body>
+</html>
